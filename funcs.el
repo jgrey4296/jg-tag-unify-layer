@@ -155,13 +155,12 @@ If preferred-length is not specified, use jg-tag-unify-layer/preferred-linecount
   (message "Hiding Properties")
   ;; indent region
   (spacemacs/indent-region-or-buffer)
-  (whitespace-cleanup)
+  ;; (whitespace-cleanup)
   ;; fill
   (fill-region (point-min) (point-max))
 
-  ;;Reset to beginning
-  (goto-char (point-min))
   ;;Find all pic.twitter's and ensure on new line
+  (goto-char (point-min))
   (message "Finding pic.twitter's")
   (while (search-forward "pic.twitter" nil t)
     (let ((sub (buffer-substring (line-beginning-position) (point))))
@@ -184,10 +183,10 @@ If preferred-length is not specified, use jg-tag-unify-layer/preferred-linecount
   (org-map-entries 'jg-tag-unify-layer/map-entries-clean-whitespace t nil)
   (set-marker jg-tag-unify-layer/org-clean-marker nil)
 
-  (goto-char (point-min))
+  ;; Tidy all links:
   ;; DO NOT USE ORG-NEXT-LINK
   ;; it ignores links in property drawers
-  ;; (debug)
+  (goto-char (point-min))
   (while (re-search-forward org-link-any-re nil t)
     (set-marker jg-tag-unify-layer/org-clean-marker (point))
     (goto-char (car (match-data 0)))
@@ -213,18 +212,21 @@ If preferred-length is not specified, use jg-tag-unify-layer/preferred-linecount
       )
     (goto-char jg-tag-unify-layer/org-clean-marker)
     )
+
   (message "Indenting")
   (spacemacs/indent-region-or-buffer)
   (whitespace-cleanup)
   (setq jg-tag-unify-layer/org-clean-marker nil)
 
+  ;;Find and replace
   (goto-char (point-min))
   (while (re-search-forward "]\\[\n[[:space:]]+" nil t)
     (replace-match "][")
     )
+
   (org-cycle-hide-drawers 'all)
-  (message "Org Clean Finished")
   (goto-char (point-min ))
+  (message "Org Clean Finished")
   )
 (defun jg-tag-unify-layer/map-entries-clean-whitespace ()
   "Called from org-map-entries. reduces whitespace prior
@@ -555,6 +557,23 @@ Return a hash-table of tags with their instance counts"
     )
   )
 
+(defun jg-tag-unify-layer/dired-directory-count-untagged ()
+  (interactive)
+  (let ((counts 0)
+        (untagged-p (lambda (x) (not (jg-tag-unify-layer/org-tagged-p x))))
+        )
+    (dired-map-over-marks
+     (if (f-dir? (dired-get-filename))
+         (incf counts (length
+                       (seq-filter untagged-p (directory-files-recursively (dired-get-filename) "\.org"))
+                       )
+               )
+       )
+     nil
+     )
+    (message "%s Org files untagged" counts)
+    )
+  )
 (defun jg-tag-unify-layer/chart-tag-counts (counthash name)
   "Given a hashtable of counts, create a buffer with a bar chart of the counts"
   ;; (message "Charting: %s %s" counthash name)
@@ -880,6 +899,29 @@ Prefix-arg to move the file otherwise copy it
                     marked))
     )
   )
+
+(defun jg-tag-unify-layer/quick-compress-orgs ()
+  " Get all org files and put them in a directory read for compression "
+  (interactive)
+  (let* ((curr default-directory)
+         (files (directory-files-recursively curr "\\.org"))
+         (target_dir "compressed_orgs")
+         )
+    ;;Make the top level
+    (if (not (f-exists? (f-join curr target_dir)))
+        (mkdir (f-join curr target_dir)))
+    ;;Copy files over
+    (mapc (lambda (x)
+            (let ((target (f-join curr target_dir (-last-item (f-split (f-parent x))))))
+              (if (not (f-exists? target)) (mkdir target))
+              (copy-file x (format "%s/" target))
+              )
+            ) files)
+    (dired-compress-file (f-join curr target_dir))
+    (delete-directory (f-join curr target_dir) t t)
+    )
+  )
+
 
 ;; Indexing
 (defun jg-tag-unify-layer/index-people ()
