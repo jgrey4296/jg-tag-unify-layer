@@ -46,8 +46,8 @@
     )
   (spacemacs/declare-prefix "a h" "Helms")
   (spacemacs/set-leader-keys
-    "a h B" 'jg-tag-unify-layer/helm-bookmarks
-    "a h T" 'jg-tag-unify-layer/helm-twitter
+    "a h f" 'jg-tag-unify-layer/helm-bookmarks
+    "a h t" 'jg-tag-unify-layer/helm-twitter
     )
 
   (defun jg-tag-unify-layer/file-select-helm (candidates)
@@ -167,9 +167,6 @@
       ". L" 'jg-tag-unify-layer/wrap-non-link-urls
       ". D" 'jg-tag-unify-layer/remove-duplicates
       )
-    (evil-define-key 'normal 'evil-org-mode-map
-      (kbd "g >") 'org-next-link
-      )
     )
   (add-hook 'org-mode-hook 'jg-tag-unify-layer/org-mod-map)
 
@@ -188,18 +185,21 @@
 
   )
 (defun jg-tag-unify-layer/post-init-dired ()
+  (spacemacs/declare-prefix-for-mode 'dired-mode
+    "m K" "Destructive Edits")
   (spacemacs/set-leader-keys-for-major-mode 'dired-mode
-    "c" 'jg-tag-unify-layer/clean-marked-files
-    "!" 'jg-tag-unify-layer/chop-long-files-from-dired
-    "B" 'jg-tag-unify-layer/unify-pdf-locations
+    "K c" 'jg-tag-unify-layer/clean-marked-files
+    "K C" 'jg-tag-unify-layer/chop-long-files-from-dired
+    "K B" 'jg-tag-unify-layer/unify-pdf-locations
+    "K Z" 'jg-tag-unify-layer/quick-compress-orgs
+
     "t" 'jg-tag-unify-layer/mark-untagged-orgs
+    "T" 'jg-tag-unify-layer/dired-directory-count-untagged
     "r" 'jg-tag-unify-layer/find-random-marked-file
     "d" 'jg-tag-unify-layer/describe-marked-tags
     )
   )
 (defun jg-tag-unify-layer/post-init-evil ()
-
-
   (evil-ex-define-cmd "t[ag]" 'jg-tag-unify-layer/jg-tag-unify-layer-helm-start)
   (evil-ex-define-cmd "to" 'jg-tag-unify-layer/tag-occurrences)
   (evil-ex-define-cmd "toa" 'jg-tag-unify-layer/tag-occurrences-in-open-buffers)
