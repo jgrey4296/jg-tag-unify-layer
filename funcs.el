@@ -922,6 +922,26 @@ Prefix-arg to move the file otherwise copy it
     )
   )
 
+(defun jg-tag-unify-layer/split-on-char-n (beg end n)
+  (interactive "r\nnSplit on char number: ")
+  (save-excursion
+    (goto-char beg)
+    (let ((last-char (downcase (char-after (+ (point) n))))
+          curr-char)
+      (while (< (point) end)
+        (setq curr-char (downcase (char-after (+ (point) n))))
+        (if (not (eq last-char curr-char))
+            (progn
+              (setq last-char curr-char)
+              (goto-char (line-beginning-position))
+              (insert "\n")
+              )
+          )
+        (forward-line)
+        )
+      )
+    )
+  )
 
 ;; Indexing
 (defun jg-tag-unify-layer/index-people ()
