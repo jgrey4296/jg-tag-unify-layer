@@ -144,7 +144,7 @@ If preferred-length is not specified, use jg-tag-unify-layer/preferred-linecount
   "A Dired buffer function to clean org files "
   (interactive)
   (let ((files (dired-get-marked-files)))
-    (seq-each 'jg-tag-unify-layer/dired-clean-orgs)
+    (seq-each 'jg-tag-unify-layer/dired-clean-orgs files)
     )
   )
 (defun jg-tag-unify-layer/clean-org ()
