@@ -944,6 +944,18 @@ Prefix-arg to move the file otherwise copy it
     )
   )
 
+(defun jg-tag-unify-layer/select-random-tags (n)
+  (interactive "nHow many tags? ")
+  (let* ((tags (hash-table-keys jg-tag-unify-layer/global-tags))
+         (selection (mapcar (lambda (x) (seq-random-elt tags)) (make-list n ?a)))
+         )
+    (with-temp-buffer-window "*Rand Tags*"
+                             'display-buffer-pop-up-frame
+                             nil
+                             (mapc (lambda (x) (princ x ) (princ "\n")) selection)
+                             )
+    )
+  )
 ;; Indexing
 (defun jg-tag-unify-layer/index-people ()
   " Run rountine to index all twitter users in the current directory "
