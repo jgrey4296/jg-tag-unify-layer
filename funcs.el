@@ -272,11 +272,10 @@ to point to a single new line"
   (let* ((entry-details (cadr (org-element-at-point)))
          (permalink (plist-get entry-details :PERMALINK))
          (begin (plist-get entry-details :begin))
-         (end (plist-get entry-details :end))
          (level (plist-get entry-details :level))
          )
-    (if (and permalink begin end level (string-match "\\[\\[.+?\\]\\[\\(.+?\\)\\]\\]" permalink))
-        `(,(match-string 1 permalink) ,begin ,end ,level)
+    (if (and permalink begin level (string-match "\\[\\[.+?\\]\\[\\(.+?\\)\\]\\]" permalink))
+        `(,(match-string 1 permalink) ,begin ,level)
       nil)
     )
   )
@@ -302,17 +301,19 @@ to point to a single new line"
     (message "To Remove: %s" (length to-remove))
     ;;Now remove those duplicates
     (cl-loop for tweet in to-remove
-             do (progn
+             do (let* ((begin (nth 1 tweet))
+                       (end (progn
+                              (goto-char begin)
+                              (plist-get (cadr (org-element-at-point)) :end))))
                   (message "Getting: %s" tweet)
                   ;; copy tweet into deletion buffer
-                  (princ (buffer-substring-no-properties (nth 1 tweet)
-                                                         (- (nth 2 tweet) 1))
+                  (princ (buffer-substring-no-properties begin (- end 1))
                          archive-buffer)
                   ;; replace it in the original with a replaced link to the remaining
-                  (delete-region (nth 1 tweet) (- (nth 2 tweet) 1))
-                  (goto-char (nth 1 tweet))
+                  (delete-region begin (- end 1))
+                  (goto-char begin)
                   (insert (format "%s Duplicate of %s\n\n"
-                                  (make-string (nth 3 tweet) ?*)
+                                  (make-string (nth 2 tweet) ?*)
                                   (nth 0 tweet)))
                   )
              )
