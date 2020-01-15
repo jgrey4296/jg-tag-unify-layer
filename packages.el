@@ -193,11 +193,13 @@
     "K C" 'jg-tag-unify-layer/chop-long-files-from-dired
     "K B" 'jg-tag-unify-layer/unify-pdf-locations
     "K Z" 'jg-tag-unify-layer/quick-compress-orgs
+    "K J" 'jg-tag-unify-layer/reformat-jsons
 
     "t" 'jg-tag-unify-layer/mark-untagged-orgs
     "T" 'jg-tag-unify-layer/dired-directory-count-untagged
     "r" 'jg-tag-unify-layer/find-random-marked-file
     "d" 'jg-tag-unify-layer/describe-marked-tags
+    "N" 'jg-tag-unify-layer/display-selection
     )
   )
 (defun jg-tag-unify-layer/post-init-evil ()

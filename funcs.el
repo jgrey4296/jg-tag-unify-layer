@@ -924,6 +924,8 @@ Prefix-arg to move the file otherwise copy it
   )
 
 (defun jg-tag-unify-layer/split-on-char-n (beg end n)
+  "Loop through buffer, inserting newlines between lines where
+the nth char changes"
   (interactive "r\nnSplit on char number: ")
   (save-excursion
     (goto-char beg)
@@ -1042,4 +1044,46 @@ Prefix-arg to move the file otherwise copy it
       )
     )
   (message "Finished writing file")
+  )
+
+;;json
+(defun jg-tag-unify-layer/reformat-json-file (file)
+  (assert (f-ext? file "json"))
+  (with-temp-buffer
+    (insert-file file)
+    (json-mode-beautify)
+    (write-file (format "%s_cleaned.json" (f-join (f-parent file)
+                                                  (f-base file))))
+    )
+  )
+
+(defun jg-tag-unify-layer/reformat-jsons ()
+  (interactive)
+  (let ((files (dired-get-marked-files)))
+    (seq-each 'jg-tag-unify-layer/reformat-json-file files)
+    )
+  )
+
+(defun jg-tag-unify-layer/open-selection (pair)
+  (let ((file (car pair))
+        (selection-size (cdr pair))
+        selection)
+    (with-temp-buffer
+      (insert-file file)
+      (goto-char (random (- (point-max) selection-size)))
+      (setq selection (buffer-substring (point) (+ (point) selection-size)))
+      )
+    (with-temp-buffer-window (format "*%s - selection*" (-last-item (f-split file)))
+                             nil nil
+                             (princ selection)
+                             )
+    )
+  )
+
+(defun jg-tag-unify-layer/display-selection (n)
+  (interactive "nNum Chars: ")
+  (let ((files (dired-get-marked-files)))
+    (seq-each 'jg-tag-unify-layer/open-selection
+              (-zip-fill n files '()))
+    )
   )
