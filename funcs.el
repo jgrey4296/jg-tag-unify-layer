@@ -25,7 +25,7 @@
       (goto-char (car jg-tag-unify-layer/jg-tag-unify-layer-region))
       (setq prior-point (- (point) 1))
       (while (and (/= prior-point (point)) (< (line-number-at-pos (point)) end-line))
-        (progn (setq current-tags (split-string (bibtex-autokey-get-field "tags") "," t " ")
+        (progn (setq current-tags (split-string (bibtex-autokey-get-field "tags") "," t " +")
                      prior-point (point))
                (mapc add-func actual-candidates)
                (bibtex-set-field "tags" (string-join current-tags ","))
@@ -43,7 +43,7 @@
           )
       (while (and (/= prior-point (point)) (< (line-number-at-pos (point)) end-line))
         (setq prior-point (point))
-        (let* ((current-tags (split-string (bibtex-autokey-get-field "tags") "," t " ")))
+        (let* ((current-tags (split-string (bibtex-autokey-get-field "tags") "," t " +")))
           (if (not (-contains? current-tags stripped_tag))
               (progn
                 (push stripped_tag current-tags)
@@ -75,7 +75,7 @@ ensuring they work across machines "
     )
   )
 
-;; file name processing
+;; file processing
 (defun jg-tag-unify-layer/chop-long-file (name &optional preferred-length)
   "Take long org files and split them into multiple files
 If preferred-length is not specified, use jg-tag-unify-layer/preferred-linecount-for-org
@@ -123,6 +123,33 @@ If preferred-length is not specified, use jg-tag-unify-layer/preferred-linecount
   (interactive)
   (let ((files (dired-get-marked-files)))
     (seq-each 'jg-tag-unify-layer/chop-long-file files)
+    )
+  )
+(defun jg-tag-unify-layer/move-links ()
+  " Go through all links in a file,
+and either copy, or move, the the referenced file to a new location
+Prefix-arg to move the file otherwise copy it
+"
+  (interactive)
+  ;;Specify target, or use default
+  (let ((target (read-directory-name "Move To: "
+                                     "/Volumes/Overflow/missing_images/"))
+        (action (if current-prefix-arg 'rename-file 'copy-file))
+        link
+        )
+    (if (not (file-exists-p target))
+        (progn (message "Making target directory: %s" target)
+               (mkdir target))
+      )
+    (message "Process Type: %s" action)
+    (goto-char (point-min))
+    (while (eq t (org-next-link))
+      (setq link (plist-get (plist-get (org-element-context) 'link) :path))
+      (message "Processing: %s" link)
+      (if (not (f-exists? (f-join target (-last-item (f-split link)))))
+          (funcall action link target)
+        (message "Already Exists"))
+      )
     )
   )
 
@@ -320,7 +347,127 @@ to point to a single new line"
     )
   )
 
-;; helm
+(defun jg-tag-unify-layer/org-format-temp-buffer (name source_name)
+  " Format bar chart buffer as an org buffer.
+Adds a header, separates similar counted lines into sub headings,
+and sorts groups alphabetically"
+  (with-current-buffer name
+    (org-mode)
+    (let ((inhibit-read-only 't)
+          (last_num nil)
+          (get_num_re ": \\([[:digit:]]+\\) +:")
+          (start-marker (make-marker))
+          (end-marker (make-marker))
+          (sort-fold-case t)
+          matched
+          )
+      ;;Loop over all lines
+      (goto-char (point-min))
+      (set-marker start-marker (point))
+      (while (re-search-forward get_num_re nil 't)
+        (setq matched (match-string 1))
+        (cond
+         ((not last_num) t)
+         ((not (string-equal last_num matched))
+          (progn (set-marker end-marker (line-beginning-position))
+                 (if (> (- end-marker 1) start-marker)
+                     (sort-lines nil start-marker (- end-marker 1)))
+                 (goto-char start-marker)
+                 (insert "** ")
+                 (goto-char end-marker)
+                 (set-marker start-marker end-marker)
+                 )))
+        (setq last_num matched)
+        (forward-line)
+        )
+      ;;clean up last group:
+      (set-marker end-marker (line-beginning-position))
+      (if (> end-marker start-marker)
+          (sort-lines nil start-marker (- end-marker 1)))
+      (goto-char start-marker)
+      (insert "** ")
+      ;;Add Header:
+      (goto-char (point-min))
+      (insert "* Tag Summary for: " source_name "\n")
+      (indent-region (point-min) (point-max))
+      )
+    )
+  )
+(defun jg-tag-unify-layer/org-split-temp-buffer-create (args)
+  "Given a pair, create a temp buffer in the cdr directory,
+naming the directory based on the first line of text and insert the car "
+  ;; (message "Creating Temp buffer for: %s" args)
+  (assert (f-dir? (cdr args)))
+  (with-temp-buffer
+    (org-mode)
+    (insert (car args))
+    (goto-char (point-min))
+    (re-search-forward "^\\*\\* ")
+    (write-file (f-join (cdr args) (format "%s.org" (string-trim (buffer-substring (point) (line-end-position))))))
+    )
+  )
+(defun jg-tag-unify-layer/org-split-on-headings ()
+  " Split an org file into multiple smaller buffers non-destructively "
+  (interactive)
+  (let ((contents (buffer-substring (point-min) (point-max)))
+        (target-depth (read-number "What Depth Subtrees to Copy? "))
+        (target-dir (read-directory-name "Split into directory: "))
+        (map-fn (lambda ()
+                  (let* ((components (org-heading-components))
+                         (depth (car components)))
+                    ;;Only copy correct depths
+                    (if (eq depth target-depth)
+                        (progn
+                          ;; (message (format "Current : %s %s" count (nth 4 components)))
+                          (org-copy-subtree 1)
+                          (current-kill 0 t)
+                          )
+                      )
+                    )
+                  ))
+        results
+        )
+    (with-temp-buffer
+      (org-mode)
+      (insert contents)
+      (goto-char (point-min))
+      (setq results (-non-nil (org-map-entries map-fn)))
+      )
+    (-each (-zip-fill target-dir results '()) 'jg-tag-unify-layer/org-split-temp-buffer-create)
+    )
+  )
+(defun jg-tag-unify-layer/org-split-alphabetically ()
+  " Split a buffer of values on separate lines into headings alphabetically "
+  (interactive)
+  (goto-char (point-min))
+  (let ((current ?a)
+        (end ?z))
+    (insert "* Top\n")
+    (while (and (<= current end)
+                (re-search-forward (format "^%c" current)))
+      (goto-char (line-beginning-position))
+      (insert (format "** %c\n" current))
+      (incf current)
+      )
+    )
+  )
+(defun jg-tag-unify-layer/org-split-tag-list ()
+  " Combine the org-split functions into a single routine.
+Sort, align, split, save "
+  (interactive)
+  (let ((text (buffer-string))
+        (sort-fold-case t))
+    (with-temp-buffer
+      (insert text)
+      (sort-lines nil (point-min) (point-max))
+      (align-regexp (point-min) (point-max) "\\(\\s-*\\):" 1 nil t)
+      (jg-tag-unify-layer/org-split-alphabetically)
+      (jg-tag-unify-layer/org-split-on-headings)
+      )
+    )
+  )
+
+;; helm actions
 (defun jg-tag-unify-layer/open-url-action (x)
   " An action added to helm-grep for loading urls found in bookmarks "
   (let* ((marked (helm-marked-candidates))
@@ -343,18 +490,6 @@ to point to a single new line"
       )
     )
   )
-(defun jg-tag-unify-layer/insert-candidates (x)
-  "A Helm action to insert selected candidates into the current buffer "
-  (let ((candidates (helm-marked-candidates)))
-    (with-helm-current-buffer
-      ;;Substring -2 to chop off separating marks
-      (insert (mapconcat (lambda (x) (substring x 0 -2)) candidates "\n")))))
-(defun jg-tag-unify-layer/insert-links (x)
-  "Helm action to insert selected candidates formatted as org links"
-  (let ((candidates (helm-marked-candidates)))
-    (with-helm-current-buffer
-      ;;substring -2 to chop off separating marks
-      (insert (mapconcat (lambda (x) (format "[[%s][%s]]" (substring x 0 -2) (substring x 0 -2))) candidates "\n")))))
 (defun jg-tag-unify-layer/tweet-link-action (candidate)
   "Helm action to open a tweet buffer with the link inserted"
   (evil-window-new (get-buffer-window helm-current-buffer)
@@ -375,32 +510,6 @@ to point to a single new line"
   (let* ((text (buffer-substring-no-properties (point-min) (point-max))))
     (jg-spacemacs-twitter/twitter-tweet-text text nil '(jg-spacemacs-twitter/tweet_sentinel))
     ))
-(defun jg-tag-unify-layer/grep-filter-one-by-one (candidate)
-  "A Grep modification for bookmark helm to extract a bookmark's url and tags"
-  (if (consp candidate)
-      ;; Already computed do nothing (default as input).
-      candidate
-    (let* ((line   (helm--ansi-color-apply candidate))
-           (split  (helm-grep-split-line line))
-           ;; Normalize Size of this:
-           (lineno (nth 1 split))
-           (norm_ln (s-append (s-repeat (- 6 (string-width lineno)) " ") lineno))
-           ;; The Actual Line:
-           (str    (nth 2 split))
-           (sub    (substring str (or (s-index-of "HREF=" str) 0)))
-           (tag_index (s-index-of "TAGS=" sub))
-           (url (substring sub (string-width "HREF=\"") tag_index))
-           (tags (substring sub (+ (string-width "HREF=\"") (or tag_index 0)) (s-index-of ">" sub)))
-           (chopped_tags (substring tags 0 (min 50 (string-width tags))))
-           (norm_tags (s-append (s-repeat (- 50 (string-width chopped_tags)) " ") chopped_tags))
-           )
-      (cons (concat (propertize norm_ln 'face 'helm-grep-lineno)
-                    (propertize (concat ": " norm_tags) 'face 'rainbow-delimiters-depth-3-face)
-                    (propertize (concat ": " url) 'face 'rainbow-delimiters-depth-1-face))
-            (or url line))
-      )
-    )
-  )
 (defun jg-tag-unify-layer/org-set-tags (x)
   """ Improved action to add and remove tags Toggle Selected Tags
 Can operate on regions of headings """
@@ -428,11 +537,54 @@ Can operate on regions of headings """
                (org-set-tags current-tags)
                (org-forward-heading-same-level 1)
                )))))
+(defun jg-tag-unify-layer/insert-candidates (x)
+  "A Helm action to insert selected candidates into the current buffer "
+  (let ((candidates (helm-marked-candidates)))
+    (with-helm-current-buffer
+      ;;Substring -2 to chop off separating marks
+      (insert (mapconcat (lambda (x) (substring x 0 -2)) candidates "\n")))))
+(defun jg-tag-unify-layer/insert-links (x)
+  "Helm action to insert selected candidates formatted as org links"
+  (let ((candidates (helm-marked-candidates)))
+    (with-helm-current-buffer
+      ;;substring -2 to chop off separating marks
+      (insert (mapconcat (lambda (x) (format "[[%s][%s]]" (substring x 0 -2) (substring x 0 -2))) candidates "\n")))))
+(defun jg-tag-unify-layer/grep-filter-one-by-one (candidate)
+  "A Grep modification for bookmark helm to extract a bookmark's url and tags"
+  (if (consp candidate)
+      ;; Already computed do nothing (default as input).
+      candidate
+    (let* ((line   (helm--ansi-color-apply candidate))
+           (split  (helm-grep-split-line line))
+           ;; Normalize Size of this:
+           (lineno (nth 1 split))
+           (norm_ln (s-append (s-repeat (- 6 (string-width lineno)) " ") lineno))
+           ;; The Actual Line:
+           (str    (nth 2 split))
+           (sub    (substring str (or (s-index-of "HREF=" str) 0)))
+           (tag_index (s-index-of "TAGS=" sub))
+           (url (substring sub (string-width "HREF=\"") tag_index))
+           (tags (substring sub (+ (string-width "HREF=\"") (or tag_index 0)) (s-index-of ">" sub)))
+           (chopped_tags (substring tags 0 (min 50 (string-width tags))))
+           (norm_tags (s-append (s-repeat (- 50 (string-width chopped_tags)) " ") chopped_tags))
+           )
+      (cons (concat (propertize norm_ln 'face 'helm-grep-lineno)
+                    (propertize (concat ": " norm_tags) 'face 'rainbow-delimiters-depth-3-face)
+                    (propertize (concat ": " url) 'face 'rainbow-delimiters-depth-1-face))
+            (or url line))
+      )
+    )
+  )
 (defun jg-tag-unify-layer/find-file (x)
   "A simple helm action to open selected files"
   (let ((files (if (helm-marked-candidates) (helm-marked-candidates) (list x))))
     (mapc 'find-file (mapcar 'string-trim files))
     )
+  )
+(defun jg-tag-unify-layer/process-candidates (x)
+  "Utility to tidy bibtex-completion-candidates for helm-bibtex"
+  (cons (s-replace-regexp ",? +" " " (car x))
+        (cdr x))
   )
 
 ;; tags
@@ -517,34 +669,7 @@ Return a hash-table of tags with their instance counts"
       (message "No Tags in buffers"))
     )
   )
-(defun jg-tag-unify-layer/describe-marked-tags ()
-  "Dired action to describe tags in marked files"
-  (interactive)
-  (let ((marked (dired-get-marked-files))
-        (targetdepth (or current-prefix-arg 2))
-        (alltags (make-hash-table :test 'equal))
-        )
-    ;; (message "Describing marked file tags to depth: %s" targetdepth)
-    (loop for x in marked do
-          (maphash (lambda (k v) (incf (gethash k alltags 0) v)) (jg-tag-unify-layer/get-file-tags x targetdepth))
-          )
-    (if (not (hash-table-empty-p alltags))
-        (jg-tag-unify-layer/chart-tag-counts alltags "Dired Marked Files")
-      (message "No Tags in Files")
-      )
-    )
-  )
 
-(defun jg-tag-unify-layer/mark-untagged-orgs ()
-  "Dired action to mark org files which are not tagged at heading depth 2"
-  (interactive)
-  (dired-map-over-marks
-   (progn (if (or (not (f-ext? (dired-get-filename) "org"))
-                  (jg-tag-unify-layer/org-tagged-p (dired-get-filename)))
-              (dired-unmark 1)))
-   nil
-   )
-  )
 (defun jg-tag-unify-layer/org-tagged-p  (filename)
   "Test an org file. Returns true if the file has tags for all depth 2 headings"
   (with-temp-buffer
@@ -555,44 +680,6 @@ Return a hash-table of tags with their instance counts"
            (filtered (seq-filter (lambda (x) (and (eq 2 (car x)) (null (cadr x)))) mapped)))
       (seq-empty-p filtered)
       )
-    )
-  )
-
-(defun jg-tag-unify-layer/dired-directory-count-untagged ()
-  (interactive)
-  (let ((counts 0)
-        (untagged-p (lambda (x) (not (jg-tag-unify-layer/org-tagged-p x))))
-        )
-    (dired-map-over-marks
-     (if (f-dir? (dired-get-filename))
-         (incf counts (length
-                       (seq-filter untagged-p (directory-files-recursively (dired-get-filename) "\.org"))
-                       )
-               )
-       )
-     nil
-     )
-    (message "%s Org files untagged" counts)
-    )
-  )
-(defun jg-tag-unify-layer/chart-tag-counts (counthash name)
-  "Given a hashtable of counts, create a buffer with a bar chart of the counts"
-  ;; (message "Charting: %s %s" counthash name)
-  (let* ((hashPairs (-zip (hash-table-keys counthash) (hash-table-values counthash)))
-         (sorted (sort hashPairs (lambda (a b) (> (cdr a) (cdr b)))))
-         (maxTagLength (apply 'max (mapcar (lambda (x) (length (car x))) sorted)))
-         (maxTagAmnt (apply 'max (mapcar (lambda (x) (cdr x)) sorted)))
-         )
-    ;;print them all out
-
-    (with-temp-buffer-window "*Tags*"
-                             nil
-                             nil
-                             ;; Todo: Expand this func to group and add org headings
-                             (mapc (lambda (x) (princ (format "%s\n" x)))
-                                   (jg-tag-unify-layer/make-bar-chart sorted maxTagLength maxTagAmnt))
-                             )
-    (jg-tag-unify-layer/org-format-temp-buffer "*Tags*" name)
     )
   )
 
@@ -627,80 +714,190 @@ Return a hash-table of tags with their instance counts"
           (org-forward-heading-same-level 1)
           )))))
 
-(defun jg-tag-unify-layer/auto-tag-marked-files ()
-  " Process marked files, adding tags to threads if
-already used tag keywords are in the thread"
-  (interactive)
-  (assert (not (hash-table-empty-p jg-tag-unify-layer/global-tags)))
-  (let ((marked-files (dired-get-marked-files)))
-    (loop for x in marked-files do
-          (jg-tag-unify-layer/auto-tag-file x)
-          )
+(defun jg-tag-unify-layer/chart-tag-counts (counthash name)
+  "Given a hashtable of counts, create a buffer with a bar chart of the counts"
+  ;; (message "Charting: %s %s" counthash name)
+  (let* ((hashPairs (-zip (hash-table-keys counthash) (hash-table-values counthash)))
+         (sorted (sort hashPairs (lambda (a b) (> (cdr a) (cdr b)))))
+         (maxTagLength (apply 'max (mapcar (lambda (x) (length (car x))) sorted)))
+         (maxTagAmnt (apply 'max (mapcar (lambda (x) (cdr x)) sorted)))
+         )
+    ;;print them all out
+
+    (with-temp-buffer-window "*Tags*"
+                             nil
+                             nil
+                             ;; Todo: Expand this func to group and add org headings
+                             (mapc (lambda (x) (princ (format "%s\n" x)))
+                                   (jg-tag-unify-layer/make-bar-chart sorted maxTagLength maxTagAmnt))
+                             )
+    (jg-tag-unify-layer/org-format-temp-buffer "*Tags*" name)
     )
   )
-(defun jg-tag-unify-layer/auto-tag-this-file ()
-  (interactive)
-  (goto-char (point-min))
-  (org-map-tree 'jg-tag-unify-layer/auto-tag-thread)
+(defun jg-tag-unify-layer/make-bar-chart (data maxTagLength maxTagAmnt)
+  " Make a bar chart from passed in hashtable and descriptive information "
+  (let* ((maxTagStrLen (length (number-to-string maxTagAmnt)))
+         (maxTagLength-bounded (min 40 maxTagLength))
+         (max-column (- fill-column (+ 3 maxTagLength-bounded maxTagStrLen 3 3)))
+         (bar-div (/ (float max-column) maxTagAmnt)))
+    (mapcar 'jg-tag-unify-layer/bar-chart-line data)))
+(defun jg-tag-unify-layer/bar-chart-line (x)
+  "Construct a single line of a bar chart"
+  (let* ((tag (car x))
+         (tag-len (length tag))
+         (tag-cut-len (- maxTagLength-bounded 3))
+         (tag-truncated-p (> tag-len maxTagLength-bounded))
+         (tag-substr (if tag-truncated-p (string-join `(,(substring tag nil tag-cut-len) "..."))
+                       tag))
+         (tag-final-len (length tag-substr))
+         (amount (cdr x))
+         (amount-str (number-to-string amount))
+         (sep-offset (- (+ 3 maxTagLength-bounded) tag-final-len))
+         (amount-offset (- maxTagStrLen (length amount-str)))
+         (bar-len (ceiling (* bar-div amount)))
+         )
+    (string-join `(,tag-substr
+                   ,(make-string sep-offset ?\ )
+                   " : "
+                   ,amount-str
+                   ,(make-string amount-offset ?\ )
+                   " : "
+                   ,(make-string bar-len ?=)
+                   ;; "\n"
+                   )))
   )
-(defun jg-tag-unify-layer/auto-tag-file (x)
-  "Given a file, load it and process each thread"
-  (with-temp-buffer
-    (insert-file-contents x)
-    (org-mode)
-    (goto-char (point-min))
-    (org-map-tree 'jg-tag-unify-layer/auto-tag-thread)
+(defun jg-tag-unify-layer/barchart-region()
+  " Create a Bar Chart of value pairs of the selected region "
+  (interactive)
+  (assert (eq evil-state 'visual))
+  (let* (;;grab the region
+         (text (buffer-substring-no-properties evil-visual-beginning
+                                               evil-visual-end))
+         ;;split text into pairs
+         (lines (split-string text "\n" t " +"))
+         (pairs (mapcar (lambda (x) (split-string x ":" t " +")) lines))
+         (count-hash (make-hash-table :test 'equal))
+         )
+    ;; (message "Getting Tags for all buffers to depth: %s" depth)
+    (mapcar (lambda (x) (incf (gethash (car x) count-hash 0) (string-to-number (cadr x)))) pairs)
+    (if (not (hash-table-empty-p count-hash))
+        (jg-tag-unify-layer/chart-tag-counts count-hash (buffer-name))
+      (message "No Tags in buffer")))
+  )
+
+(defun jg-tag-unify-layer/select-random-tags (n)
+  (interactive "nHow many tags? ")
+  (let* ((tags (hash-table-keys jg-tag-unify-layer/global-tags))
+         (selection (mapcar (lambda (x) (seq-random-elt tags)) (make-list n ?a)))
+         )
+    (with-temp-buffer-window "*Rand Tags*"
+                             'display-buffer-pop-up-frame
+                             nil
+                             (mapc (lambda (x) (princ x ) (princ "\n")) selection)
+                             )
     )
   )
-(defun jg-tag-unify-layer/auto-tag-thread ()
-  "Called on each heading of a file, only run
-for headings of depth 2
-Use all words in thread as queries to master tag list,
-add matches to thread tags
-"
-  (message "Auto Tagging thread: %s" (org-get-heading))
-  (let ((depth (car (org-heading-components)))
-        (to-tag-list (make-hash-table :test 'equal))
-        (curr-tags (org-get-tags nil t))
-        words)
-    (if (eq depth 2)
-        (progn
-          (setq words (s-split-words (substring-no-properties (org-get-entry))))
-          (loop for x in words do
-                (if (gethash x jg-tag-unify-layer/global-tags)
-                    (puthash x 1 to-tag-list)
-                  )
-                )
-          (if to-tag-list
-              (org-set-tags (union (hash-table-keys to-tag-list) curr-tags :test 'equal))
-            )
+
+;; dired actions
+(defun jg-tag-unify-layer/describe-marked-tags ()
+  "Dired action to describe tags in marked files"
+  (interactive)
+  (let ((marked (dired-get-marked-files))
+        (targetdepth (or current-prefix-arg 2))
+        (alltags (make-hash-table :test 'equal))
+        )
+    ;; (message "Describing marked file tags to depth: %s" targetdepth)
+    (loop for x in marked do
+          (maphash (lambda (k v) (incf (gethash k alltags 0) v)) (jg-tag-unify-layer/get-file-tags x targetdepth))
           )
+    (if (not (hash-table-empty-p alltags))
+        (jg-tag-unify-layer/chart-tag-counts alltags "Dired Marked Files")
+      (message "No Tags in Files")
       )
+    )
+  )
+(defun jg-tag-unify-layer/mark-untagged-orgs ()
+  "Dired action to mark org files which are not tagged at heading depth 2"
+  (interactive)
+  (dired-map-over-marks
+   (progn (if (or (not (f-ext? (dired-get-filename) "org"))
+                  (jg-tag-unify-layer/org-tagged-p (dired-get-filename)))
+              (dired-unmark 1)))
+   nil
+   )
+  )
+(defun jg-tag-unify-layer/dired-directory-count-untagged ()
+  (interactive)
+  (let ((counts 0)
+        (untagged-p (lambda (x) (not (jg-tag-unify-layer/org-tagged-p x))))
+        )
+    (dired-map-over-marks
+     (if (f-dir? (dired-get-filename))
+         (incf counts (length
+                       (seq-filter untagged-p (directory-files-recursively (dired-get-filename) "\.org"))
+                       )
+               )
+       )
+     nil
+     )
+    (message "%s Org files untagged" counts)
+    )
+  )
+(defun jg-tag-unify-layer/find-random-marked-file ()
+  "Dired action to open a random file from the marked selection"
+  (interactive)
+  (let ((marked (dired-get-marked-files)))
+    (find-file (nth (random (length marked))
+                    marked))
+    )
+  )
+(defun jg-tag-unify-layer/quick-compress-orgs ()
+  " Get all org files and put them in a directory read for compression "
+  (interactive)
+  (let* ((curr default-directory)
+         (files (directory-files-recursively curr "\\.org"))
+         (target_dir "compressed_orgs")
+         )
+    ;;Make the top level
+    (if (not (f-exists? (f-join curr target_dir)))
+        (mkdir (f-join curr target_dir)))
+    ;;Copy files over
+    (mapc (lambda (x)
+            (let ((target (f-join curr target_dir (-last-item (f-split (f-parent x))))))
+              (if (not (f-exists? target)) (mkdir target))
+              (copy-file x (format "%s/" target))
+              )
+            ) files)
+    (dired-compress-file (f-join curr target_dir))
+    (delete-directory (f-join curr target_dir) t t)
+    )
+  )
+(defun jg-tag-unify-layer/open-selection (pair)
+  " Open only a selection of a large file "
+  (let ((file (car pair))
+        (selection-size (cdr pair))
+        selection)
+    (with-temp-buffer
+      (insert-file file)
+      (goto-char (random (- (point-max) selection-size)))
+      (setq selection (buffer-substring (point) (+ (point) selection-size)))
+      )
+    (with-temp-buffer-window (format "*%s - selection*" (-last-item (f-split file)))
+                             nil nil
+                             (princ selection)
+                             )
+    )
+  )
+(defun jg-tag-unify-layer/display-selection (n)
+  "Open only a selection of large files "
+  (interactive "nNum Chars: ")
+  (let ((files (dired-get-marked-files)))
+    (seq-each 'jg-tag-unify-layer/open-selection
+              (-zip-fill n files '()))
     )
   )
 
 ;; utility
-(defun jg-tag-unify-layer/process-candidates (x)
-  "Utility to tidy bibtex-completion-candidates for helm-bibtex"
-  (cons (s-replace-regexp ",? +" " " (car x))
-        (cdr x))
-  )
-(defun jg-tag-unify-layer/rebuild-tag-database ()
-  "Rebuild the tag database from global-tags-location "
-  (interactive)
-  (clrhash jg-tag-unify-layer/global-tags)
-  (if (f-exists? jg-tag-unify-layer/global-tags-location)
-      (with-temp-buffer
-        (insert-file jg-tag-unify-layer/global-tags-location)
-        (goto-char (point-min))
-        (while (< (point) (point-max))
-          ((lambda (x) (puthash (car x) (string-to-number (cadr x)) jg-tag-unify-layer/global-tags)) (split-string (buffer-substring (line-beginning-position) (line-end-position)) ":" nil " "))
-          (forward-line)
-          )
-        )
-    (message "ERROR: GLOBAL-TAGS-LOCATION IS EMPTY")
-    )
-  )
 (defun jg-tag-unify-layer/strip_spaces (str)
   "Utility to replace spaces with underscores in a string.
 Used to guard inputs in tag strings"
@@ -746,183 +943,6 @@ Used to guard inputs in tag strings"
       '()
       ))
   )
-(defun jg-tag-unify-layer/make-bar-chart (data maxTagLength maxTagAmnt)
-  " Make a bar chart from passed in hashtable and descriptive information "
-  (let* ((maxTagStrLen (length (number-to-string maxTagAmnt)))
-         (maxTagLength-bounded (min 40 maxTagLength))
-         (max-column (- fill-column (+ 3 maxTagLength-bounded maxTagStrLen 3 3)))
-         (bar-div (/ (float max-column) maxTagAmnt)))
-    (mapcar 'jg-tag-unify-layer/bar-chart-line data)))
-
-(defun jg-tag-unify-layer/bar-chart-line (x)
-  "Construct a single line of a bar chart"
-  (let* ((tag (car x))
-         (tag-len (length tag))
-         (tag-cut-len (- maxTagLength-bounded 3))
-         (tag-truncated-p (> tag-len maxTagLength-bounded))
-         (tag-substr (if tag-truncated-p (string-join `(,(substring tag nil tag-cut-len) "..."))
-                       tag))
-         (tag-final-len (length tag-substr))
-         (amount (cdr x))
-         (amount-str (number-to-string amount))
-         (sep-offset (- (+ 3 maxTagLength-bounded) tag-final-len))
-         (amount-offset (- maxTagStrLen (length amount-str)))
-         (bar-len (ceiling (* bar-div amount)))
-         )
-    (string-join `(,tag-substr
-                   ,(make-string sep-offset ?\ )
-                   " : "
-                   ,amount-str
-                   ,(make-string amount-offset ?\ )
-                   " : "
-                   ,(make-string bar-len ?=)
-                   ;; "\n"
-                   )))
-  )
-
-(defun jg-tag-unify-layer/org-format-temp-buffer (name source_name)
-  " Format bar chart buffer as an org buffer.
-Adds a header, separates similar counted lines into sub headings,
-and sorts groups alphabetically"
-  (with-current-buffer name
-    (org-mode)
-    (let ((inhibit-read-only 't)
-          (last_num nil)
-          (get_num_re ": \\([[:digit:]]+\\) +:")
-          (start-marker (make-marker))
-          (end-marker (make-marker))
-          (sort-fold-case t)
-          matched
-          )
-      ;;Loop over all lines
-      (goto-char (point-min))
-      (set-marker start-marker (point))
-      (while (re-search-forward get_num_re nil 't)
-        (setq matched (match-string 1))
-        (cond
-         ((not last_num) t)
-         ((not (string-equal last_num matched))
-          (progn (set-marker end-marker (line-beginning-position))
-                 (if (> (- end-marker 1) start-marker)
-                     (sort-lines nil start-marker (- end-marker 1)))
-                 (goto-char start-marker)
-                 (insert "** ")
-                 (goto-char end-marker)
-                 (set-marker start-marker end-marker)
-                 )))
-        (setq last_num matched)
-        (forward-line)
-        )
-      ;;clean up last group:
-      (set-marker end-marker (line-beginning-position))
-      (if (> end-marker start-marker)
-          (sort-lines nil start-marker (- end-marker 1)))
-      (goto-char start-marker)
-      (insert "** ")
-      ;;Add Header:
-      (goto-char (point-min))
-      (insert "* Tag Summary for: " source_name "\n")
-      (indent-region (point-min) (point-max))
-      )
-    )
-  )
-(defun jg-tag-unify-layer/org-split-temp-buffer-create (args)
-  "Given a pair, create a temp buffer based on the cdr,
-and insert the car "
-  ;; (message "Creating Temp buffer for: %s" args)
-  (with-temp-buffer-window (make-temp-name (cdr args)) nil nil
-                           (org-mode)
-                           (princ (car args))))
-(defun jg-tag-unify-layer/org-split-on-headings ()
-  " Split an org file into multiple smaller buffers non-destructively "
-  (interactive)
-  (let ((contents (buffer-substring (point-min) (point-max)))
-        (target-depth (read-number "What Depth Subtrees to Copy? "))
-        (orig-name (file-name-sans-extension (buffer-name)))
-        (map-fn (lambda ()
-                  (let* ((components (org-heading-components))
-                         (depth (car components)))
-                    ;;Only copy correct depths
-                    (if (eq depth target-depth)
-                        (progn
-                          ;; (message (format "Current : %s %s" count (nth 4 components)))
-                          (org-copy-subtree 1)
-                          (current-kill 0 t)
-                          )
-                      )
-                    )
-                  ))
-        results
-        )
-    (with-temp-buffer
-      (org-mode)
-      (insert contents)
-      (goto-char (point-min))
-      (setq results (-non-nil (org-map-entries map-fn)))
-      (-each (-zip-fill orig-name results '()) 'jg-tag-unify-layer/org-split-temp-buffer-create)
-      )
-    )
-  )
-
-(defun jg-tag-unify-layer/move-links ()
-  " Go through all links in a file,
-and either copy, or move, the the referenced file to a new location
-Prefix-arg to move the file otherwise copy it
-"
-  (interactive)
-  ;;Specify target, or use default
-  (let ((target (read-directory-name "Move To: "
-                                     "/Volumes/Overflow/missing_images/"))
-        (action (if current-prefix-arg 'rename-file 'copy-file))
-        link
-        )
-    (if (not (file-exists-p target))
-        (progn (message "Making target directory: %s" target)
-               (mkdir target))
-      )
-    (message "Process Type: %s" action)
-    (goto-char (point-min))
-    (while (eq t (org-next-link))
-      (setq link (plist-get (plist-get (org-element-context) 'link) :path))
-      (message "Processing: %s" link)
-      (if (not (f-exists? (f-join target (-last-item (f-split link)))))
-          (funcall action link target)
-        (message "Already Exists"))
-      )
-    )
-  )
-
-(defun jg-tag-unify-layer/find-random-marked-file ()
-  "Dired action to open a random file from the marked selection"
-  (interactive)
-  (let ((marked (dired-get-marked-files)))
-    (find-file (nth (random (length marked))
-                    marked))
-    )
-  )
-
-(defun jg-tag-unify-layer/quick-compress-orgs ()
-  " Get all org files and put them in a directory read for compression "
-  (interactive)
-  (let* ((curr default-directory)
-         (files (directory-files-recursively curr "\\.org"))
-         (target_dir "compressed_orgs")
-         )
-    ;;Make the top level
-    (if (not (f-exists? (f-join curr target_dir)))
-        (mkdir (f-join curr target_dir)))
-    ;;Copy files over
-    (mapc (lambda (x)
-            (let ((target (f-join curr target_dir (-last-item (f-split (f-parent x))))))
-              (if (not (f-exists? target)) (mkdir target))
-              (copy-file x (format "%s/" target))
-              )
-            ) files)
-    (dired-compress-file (f-join curr target_dir))
-    (delete-directory (f-join curr target_dir) t t)
-    )
-  )
-
 (defun jg-tag-unify-layer/split-on-char-n (beg end n)
   "Loop through buffer, inserting newlines between lines where
 the nth char changes"
@@ -946,24 +966,28 @@ the nth char changes"
     )
   )
 
-(defun jg-tag-unify-layer/select-random-tags (n)
-  (interactive "nHow many tags? ")
-  (let* ((tags (hash-table-keys jg-tag-unify-layer/global-tags))
-         (selection (mapcar (lambda (x) (seq-random-elt tags)) (make-list n ?a)))
-         )
-    (with-temp-buffer-window "*Rand Tags*"
-                             'display-buffer-pop-up-frame
-                             nil
-                             (mapc (lambda (x) (princ x ) (princ "\n")) selection)
-                             )
+;; Indexing
+(defun jg-tag-unify-layer/rebuild-tag-database ()
+  "Rebuild the tag database from global-tags-location "
+  (interactive)
+  (clrhash jg-tag-unify-layer/global-tags)
+  (if (f-exists? jg-tag-unify-layer/global-tags-location)
+      (with-temp-buffer
+        (insert-file jg-tag-unify-layer/global-tags-location)
+        (goto-char (point-min))
+        (while (< (point) (point-max))
+          ((lambda (x) (puthash (car x) (string-to-number (cadr x)) jg-tag-unify-layer/global-tags)) (split-string (buffer-substring (line-beginning-position) (line-end-position)) ":" nil " +"))
+          (forward-line)
+          )
+        )
+    (message "ERROR: GLOBAL-TAGS-LOCATION IS EMPTY")
     )
   )
-;; Indexing
 (defun jg-tag-unify-layer/index-people ()
   " Run rountine to index all twitter users in the current directory "
   (interactive)
   ;; Get all org files
-  (let ((all-orgs (directory-files-recursively (dired-current-directory) "\.org"))
+  (let ((all-orgs (directory-files-recursively (dired-current-directory) "\.org$"))
         (index-hash (make-hash-table :test 'equal))
         (inserted-for-file (make-hash-table :test 'equal))
         (curr-d (dired-current-directory))
@@ -1001,7 +1025,7 @@ the nth char changes"
   " Run routine to index all tags in org files "
   (interactive)
   ;; Get all org files
-  (let ((all-orgs (directory-files-recursively (dired-current-directory) "\.org"))
+  (let ((all-orgs (directory-files-recursively (dired-current-directory) "\.org$"))
         (index-hash (make-hash-table :test 'equal))
         (inserted-for-file (make-hash-table :test 'equal))
         (curr-d (dired-current-directory))
@@ -1056,34 +1080,9 @@ the nth char changes"
                                                   (f-base file))))
     )
   )
-
 (defun jg-tag-unify-layer/reformat-jsons ()
   (interactive)
   (let ((files (dired-get-marked-files)))
     (seq-each 'jg-tag-unify-layer/reformat-json-file files)
-    )
-  )
-
-(defun jg-tag-unify-layer/open-selection (pair)
-  (let ((file (car pair))
-        (selection-size (cdr pair))
-        selection)
-    (with-temp-buffer
-      (insert-file file)
-      (goto-char (random (- (point-max) selection-size)))
-      (setq selection (buffer-substring (point) (+ (point) selection-size)))
-      )
-    (with-temp-buffer-window (format "*%s - selection*" (-last-item (f-split file)))
-                             nil nil
-                             (princ selection)
-                             )
-    )
-  )
-
-(defun jg-tag-unify-layer/display-selection (n)
-  (interactive "nNum Chars: ")
-  (let ((files (dired-get-marked-files)))
-    (seq-each 'jg-tag-unify-layer/open-selection
-              (-zip-fill n files '()))
     )
   )
