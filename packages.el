@@ -38,6 +38,10 @@
           (helm-make-source "Twitter Helm" 'helm-source
             :action (helm-make-actions "File Select Helm" 'jg-tag-unify-layer/file-select-helm)
             )
+          jg-tag-unify-lauyer/twitter-heading-helm-source
+          (helm-make-source "Twitter Heading Helm" 'helm-source
+            :action (helm-make-actions "File Select Helm" 'jg-tag-unify-layer/file-select-helm)
+            )
           jg-tag-unify-layer/file-select-source
           (helm-make-source "Twitter File Select Helm" 'helm-source
             :action (helm-make-actions "Find File" 'jg-tag-unify-layer/find-file)
@@ -48,6 +52,7 @@
   (spacemacs/set-leader-keys
     "a h f" 'jg-tag-unify-layer/helm-bookmarks
     "a h t" 'jg-tag-unify-layer/helm-twitter
+    "a h h" 'jg-tag-unify-layer/helm-heading-twitter
     )
 
   (defun jg-tag-unify-layer/file-select-helm (candidates)
@@ -90,6 +95,36 @@
             :truncate-lines t
             ;;TODO: is this necessary?
             :candidates jg-tag-unify-layer/twitter-helm-candidates
+            )
+      )
+    )
+  (defun jg-tag-unify-layer/helm-heading-twitter ()
+    "Run a Helm for searching twitter users"
+    (interactive)
+    ;;if twitter info not loaded, load
+    (if (null jg-tag-unify-layer/twitter-heading-helm-candidates)
+        (with-temp-buffer
+          (setq jg-tag-unify-layer/twitter-heading-helm-candidates '())
+          (insert-file jg-tag-unify-layer/twitter-tag-index)
+          (goto-char (point-min))
+          (let (curr)
+            (while (< (point) (point-max))
+              (setq curr (split-string (buffer-substring (point) (line-end-position)) ":"))
+              (push `(,(car curr) . ,(cdr curr)) jg-tag-unify-layer/twitter-heading-helm-candidates)
+              (forward-line)
+              )
+            )
+          )
+      )
+    ;;add candidates to source
+    (let ((source (cons `(candidates . jg-tag-unify-layer/twitter-heading-helm-candidates) jg-tag-unify-layer/twitter-helm-source)))
+      ;;call helm
+      (helm :sources source
+            :full-frame t
+            :buffer "*helm twitter heading*"
+            :truncate-lines t
+            ;;TODO: is this necessary?
+            :candidates jg-tag-unify-layer/twitter-heading-helm-candidates
             )
       )
     )

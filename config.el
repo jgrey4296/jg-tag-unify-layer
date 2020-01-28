@@ -5,6 +5,7 @@
               jg-tag-unify-layer/global-tags-location "~/github/writing/resources/collate.tags"
 
               jg-tag-unify-layer/twitter-helm-candidates nil
+              jg-tag-unify-layer/twitter-heading-helm-candidates nil
               jg-tag-unify-layer/preferred-linecount-for-org 1500
               jg-tag-unify-layer/loc-master-tag-list ""
               jg-tag-unify-layer/org-clean-marker nil
