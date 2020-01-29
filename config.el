@@ -31,6 +31,8 @@
                                                     (action . (("Create" . jg-tag-unify-layer/set-new-tag)))
                                                     (filtered-candidate-transformer (lambda (_c _s) (list helm-pattern)))
                                                     )
+
+              jg-tag-unify-layer/last-similarity-arg 1
               )
 
 (add-hook 'bibtex-mode-hook

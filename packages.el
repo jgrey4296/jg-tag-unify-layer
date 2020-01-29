@@ -202,6 +202,7 @@
       ". L" 'jg-tag-unify-layer/wrap-non-link-urls
       ". D" 'jg-tag-unify-layer/remove-duplicates
       ". s" 'jg-tag-unify-layer/split-on-char-n
+      "x s" 'jg-tag-unify-layer/next-similar-string
       )
     )
   (add-hook 'org-mode-hook 'jg-tag-unify-layer/org-mod-map)

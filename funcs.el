@@ -966,6 +966,26 @@ the nth char changes"
     )
   )
 
+(defun jg-tag-unify-layer/next-similar-string ()
+  " Go through lines, finding the next adjacent string pair
+uses org-babel-edit-distance "
+  (interactive)
+  (let* ((bound (or current-prefix-arg jg-tag-unify-layer/last-similarity-arg))
+         (curr-sim (+ bound 1))
+         (s2 (downcase (string-trim (car (s-split ":" (buffer-substring (line-beginning-position) (line-end-position)))))))
+         s1
+        )
+    (while (and (< (point) (point-max))
+                (> curr-sim bound))
+      (forward-line)
+      (setq jg-tag-unify-layer/last-similarity-arg bound)
+      (setq s1 s2)
+      (setq s2 (downcase (string-trim (car (s-split ":" (buffer-substring (line-beginning-position) (line-end-position)))))))
+      (setq curr-sim (org-babel-edit-distance s1 s2))
+      )
+    )
+  (message "Using distance %s" jg-tag-unify-layer/last-similarity-arg)
+  )
 ;; Indexing
 (defun jg-tag-unify-layer/rebuild-tag-database ()
   "Rebuild the tag database from global-tags-location "
