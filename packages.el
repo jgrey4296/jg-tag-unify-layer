@@ -222,8 +222,8 @@
 
   )
 (defun jg-tag-unify-layer/post-init-dired ()
-  (spacemacs/declare-prefix-for-mode 'dired-mode
-    "m K" "Destructive Edits")
+  (spacemacs/declare-prefix-for-mode 'dired-mode "m i" "Index")
+
   (spacemacs/set-leader-keys-for-major-mode 'dired-mode
     "K c" 'jg-tag-unify-layer/clean-marked-files
     "K C" 'jg-tag-unify-layer/chop-long-files-from-dired
@@ -231,11 +231,16 @@
     "K Z" 'jg-tag-unify-layer/quick-compress-orgs
     "K J" 'jg-tag-unify-layer/reformat-jsons
 
-    "t" 'jg-tag-unify-layer/mark-untagged-orgs
-    "T" 'jg-tag-unify-layer/dired-directory-count-untagged
-    "r" 'jg-tag-unify-layer/find-random-marked-file
-    "d" 'jg-tag-unify-layer/describe-marked-tags
-    "N" 'jg-tag-unify-layer/display-selection
+    "m u" 'jg-tag-unify-layer/mark-untagged-orgs
+
+    "d u" 'jg-tag-unify-layer/dired-directory-count-untagged
+    "d t" 'jg-tag-unify-layer/describe-marked-tags
+
+    "f r" 'jg-tag-unify-layer/find-random-marked-file
+    "f s" 'jg-tag-unify-layer/display-selection
+
+    "i p" 'jg-tag-unify-layer/index-people
+    "i t" 'jg-tag-unify-layer/index-tags
     )
   )
 (defun jg-tag-unify-layer/post-init-evil ()

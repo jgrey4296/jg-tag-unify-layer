@@ -68,7 +68,7 @@ ensuring they work across machines "
     )
   )
 (defun jg-tag-unify-layer/unify-pdf-locations ()
-  "Dired function to unify file locations to relative"
+  "Unify bibtex pdf paths of marked files"
   (interactive)
   (let ((files (dired-get-marked-files)))
     (seq-each 'jg-tag-unify-layer/unify-pdf-locations-in-file files)
@@ -119,7 +119,7 @@ If preferred-length is not specified, use jg-tag-unify-layer/preferred-linecount
     )
   )
 (defun jg-tag-unify-layer/chop-long-files-from-dired ()
-  "Dired action to chop each marked file"
+  "Subdivide marked files if they are too long"
   (interactive)
   (let ((files (dired-get-marked-files)))
     (seq-each 'jg-tag-unify-layer/chop-long-file files)
@@ -168,7 +168,7 @@ Prefix-arg to move the file otherwise copy it
   (message "Finished Cleaning")
   )
 (defun jg-tag-unify-layer/clean-marked-files ()
-  "A Dired buffer function to clean org files "
+  "Clean marked Org files"
   (interactive)
   (let ((files (dired-get-marked-files)))
     (seq-each 'jg-tag-unify-layer/dired-clean-orgs files)
@@ -800,7 +800,7 @@ Return a hash-table of tags with their instance counts"
 
 ;; dired actions
 (defun jg-tag-unify-layer/describe-marked-tags ()
-  "Dired action to describe tags in marked files"
+  "Describe tags in marked files"
   (interactive)
   (let ((marked (dired-get-marked-files))
         (targetdepth (or current-prefix-arg 2))
@@ -817,7 +817,7 @@ Return a hash-table of tags with their instance counts"
     )
   )
 (defun jg-tag-unify-layer/mark-untagged-orgs ()
-  "Dired action to mark org files which are not tagged at heading depth 2"
+  "Mark org files which are not tagged at heading depth 2"
   (interactive)
   (dired-map-over-marks
    (progn (if (or (not (f-ext? (dired-get-filename) "org"))
@@ -827,6 +827,7 @@ Return a hash-table of tags with their instance counts"
    )
   )
 (defun jg-tag-unify-layer/dired-directory-count-untagged ()
+  "Count marked org files that are untagged"
   (interactive)
   (let ((counts 0)
         (untagged-p (lambda (x) (not (jg-tag-unify-layer/org-tagged-p x))))
@@ -844,7 +845,7 @@ Return a hash-table of tags with their instance counts"
     )
   )
 (defun jg-tag-unify-layer/find-random-marked-file ()
-  "Dired action to open a random file from the marked selection"
+  "Open random file from marked"
   (interactive)
   (let ((marked (dired-get-marked-files)))
     (find-file (nth (random (length marked))
@@ -852,7 +853,7 @@ Return a hash-table of tags with their instance counts"
     )
   )
 (defun jg-tag-unify-layer/quick-compress-orgs ()
-  " Get all org files and put them in a directory read for compression "
+  "Find all orgs in cwd down, compress together"
   (interactive)
   (let* ((curr default-directory)
          (files (directory-files-recursively curr "\\.org"))
@@ -873,7 +874,7 @@ Return a hash-table of tags with their instance counts"
     )
   )
 (defun jg-tag-unify-layer/open-selection (pair)
-  " Open only a selection of a large file "
+  "Open only a selection of a large file "
   (let ((file (car pair))
         (selection-size (cdr pair))
         selection)
@@ -1004,7 +1005,7 @@ uses org-babel-edit-distance "
     )
   )
 (defun jg-tag-unify-layer/index-people ()
-  " Run rountine to index all twitter users in the current directory "
+  "Index all twitter users in the current directory "
   (interactive)
   ;; Get all org files
   (let ((all-orgs (directory-files-recursively (dired-current-directory) "\.org$"))
@@ -1101,6 +1102,7 @@ uses org-babel-edit-distance "
     )
   )
 (defun jg-tag-unify-layer/reformat-jsons ()
+  "Beautify marked json files"
   (interactive)
   (let ((files (dired-get-marked-files)))
     (seq-each 'jg-tag-unify-layer/reformat-json-file files)
