@@ -1,14 +1,14 @@
 (defconst jg-tag-unify-layer-packages '(
-                               helm
-                               helm-bibtex
-                               dash
-                               f
-                               org
-                               dired
-                               evil
-                               (tag-clean-minor-mode :location local)
-                               (tag-mode :location local)
-                               )
+                                        helm
+                                        helm-bibtex
+                                        dash
+                                        f
+                                        org
+                                        dired
+                                        evil
+                                        (tag-clean-minor-mode :location local)
+                                        (tag-mode :location local)
+                                        )
   )
 
 (defun jg-tag-unify-layer/init-f ()
@@ -53,6 +53,7 @@
     "a h f" 'jg-tag-unify-layer/helm-bookmarks
     "a h t" 'jg-tag-unify-layer/helm-twitter
     "a h h" 'jg-tag-unify-layer/helm-heading-twitter
+    "a h u" 'jg-tag-unify-layer/helm-unified
     )
 
   (defun jg-tag-unify-layer/file-select-helm (candidates)
@@ -141,6 +142,70 @@
           :buffer "*helm bookmarks*"
           :truncate-lines t
           )
+    )
+
+  (defun jg-tag-unify-layer/helm-unified (arg)
+    (interactive "P")
+    ;;Clear Cache if necessary
+    (when arg
+      (bibtex-completion-clear-cache))
+    ;;Load headings if necessary
+    (if (null jg-tag-unify-layer/twitter-heading-helm-candidates)
+        (with-temp-buffer
+          (setq jg-tag-unify-layer/twitter-heading-helm-candidates '())
+          (insert-file jg-tag-unify-layer/twitter-tag-index)
+          (goto-char (point-min))
+          (let (curr)
+            (while (< (point) (point-max))
+              (setq curr (split-string (buffer-substring (point) (line-end-position)) ":"))
+              (push `(,(car curr) . ,(cdr curr)) jg-tag-unify-layer/twitter-heading-helm-candidates)
+              (forward-line)
+              )
+            )
+          )
+      )
+    ;;Load twitter users if necessary
+    (if (null jg-tag-unify-layer/twitter-helm-candidates)
+        (with-temp-buffer
+          (setq jg-tag-unify-layer/twitter-helm-candidates '())
+          (insert-file jg-tag-unify-layer/twitter-account-index)
+          (goto-char (point-min))
+          (let (curr)
+            (while (< (point) (point-max))
+              (setq curr (split-string (buffer-substring (point) (line-end-position)) ":"))
+              (push `(,(car curr) . ,(cdr curr)) jg-tag-unify-layer/twitter-helm-candidates)
+              (forward-line)
+              )
+            )
+          )
+      )
+    ;;Set local variables for bookmarks
+    (helm-set-local-variable
+     'helm-grep-include-files (format "--include=%s" jg-tag-unify-layer/loc-bookmarks)
+     'helm-grep-last-targets `(,jg-tag-unify-layer/loc-bookmarks)
+     'default-directory "~/github/writing/resources/"
+     )
+
+    ;;add candidates to source
+    (let* ((bibtex-completion-additional-search-fields '("tags" "year"))
+           (candidates-bibtex (if (or arg (null jg-tag-unify-layer/helm-bibtex-candidates))
+                                  (progn (message "Generating Candidates")
+                                         (bibtex-completion-init)
+                                         (setq jg-tag-unify-layer/helm-bibtex-candidates
+                                               (mapcar 'jg-tag-unify-layer/process-candidates (bibtex-completion-candidates)))
+                                         jg-tag-unify-layer/helm-bibtex-candidates)
+                                jg-tag-unify-layer/helm-bibtex-candidates
+                                ))
+           (source-tw (cons `(candidates . jg-tag-unify-layer/twitter-helm-candidates) jg-tag-unify-layer/twitter-helm-source))
+           (source-heading (cons `(candidates . jg-tag-unify-layer/twitter-heading-helm-candidates) jg-tag-unify-layer/twitter-helm-source)))
+      ;;call helm
+      (helm :sources '(source-heading jg-tag-unify-layer/helm-source-bibtex jg-tag-unify-layer/bookmark-helm-source )
+            :full-frame t
+            :buffer "*Helm unified*"
+            :truncate-lines t
+            :bibtex-candidates candidates-bibtex
+            )
+      )
     )
 
   )
