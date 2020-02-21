@@ -178,13 +178,12 @@ Prefix-arg to move the file otherwise copy it
   "The Main Clean-org routine"
   (interactive)
   (message "Starting Org Clean")
-
   (message "Hiding Properties")
   ;; indent region
   (spacemacs/indent-region-or-buffer)
   ;; (whitespace-cleanup)
   ;; fill
-  (fill-region (point-min) (point-max))
+  ;; (fill-region (point-min) (point-max))
 
   ;;Find all pic.twitter's and ensure on new line
   (goto-char (point-min))
