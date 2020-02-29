@@ -23,15 +23,7 @@
               jg-tag-unify-layer/jg-tag-unify-layer-candidates-names '()
               jg-tag-unify-layer/jg-tag-unify-layer-candidate-counts '()
               ;; Start Position -> End Line number because of changes in positions from tag add/retract
-              jg-tag-unify-layer/jg-tag-unify-layer-region '()
-              jg-tag-unify-layer/jg-tag-unify-layer-helm `((name . "Helm Tagging")
-                                         (action . (("set" . jg-tag-unify-layer/set-tags)))
-                                         )
-              jg-tag-unify-layer/jg-tag-unify-layer-fallback-source `((name . "")
-                                                    (action . (("Create" . jg-tag-unify-layer/set-new-tag)))
-                                                    (filtered-candidate-transformer (lambda (_c _s) (list helm-pattern)))
-                                                    )
-
+              jg-tag-unify-layer/jg-tag-unify-layer-marker (make-marker)
               jg-tag-unify-layer/last-similarity-arg 1
               )
 

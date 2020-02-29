@@ -46,6 +46,15 @@
           (helm-make-source "Twitter File Select Helm" 'helm-source
             :action (helm-make-actions "Find File" 'jg-tag-unify-layer/find-file)
             )
+
+          jg-tag-unify-layer/jg-tag-unify-layer-helm
+          (helm-make-source "Helm Tagging" 'helm-source
+            :action (helm-make-actions "Set" 'jg-tag-unify-layer/set-tags))
+
+          jg-tag-unify-layer/jg-tag-unify-layer-fallback-source
+          (helm-make-source "Helm Fallback Source" 'helm-source
+            :action (helm-make-actions "Create" 'jg-tag-unify-layer/set-new-tag)
+            :filtered-candidate-transformer (lambda (_c _s) (list helm-pattern)))
           )
     )
   (spacemacs/declare-prefix "a h" "Helms")
@@ -277,7 +286,7 @@
   (evil-define-operator jg-tag-unify-layer/jg-tag-unify-layer-helm-start (beg end)
     """ Opens the Tagging Helm """
     (interactive "<R>")
-    (setq jg-tag-unify-layer/jg-tag-unify-layer-region `(,beg . ,(line-number-at-pos end)))
+    (set-marker jg-tag-unify-layer/jg-tag-unify-layer-marker (or evil-visual-end (line-end-position)))
     (let* ((candidates (jg-tag-unify-layer/jg-tag-unify-layer-candidates))
            (main-source (cons `(candidates . ,(mapcar 'car candidates)) jg-tag-unify-layer/jg-tag-unify-layer-helm))
            )

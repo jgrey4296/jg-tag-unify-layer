@@ -9,7 +9,7 @@
   (let* ((visual-candidates (helm-marked-candidates))
          (actual-candidates (mapcar (lambda (x) (cadr (assoc x jg-tag-unify-layer/jg-tag-unify-layer-candidates-names))) visual-candidates))
          (prior-point 1)
-         (end-line (cdr jg-tag-unify-layer/jg-tag-unify-layer-region))
+         (end-pos jg-tag-unify-layer/jg-tag-unify-layer-marker)
          (current-tags '())
          (add-func (lambda (candidate)
                      (if (not (-contains? current-tags candidate))
@@ -22,9 +22,8 @@
                        )))
          )
     (save-excursion
-      (goto-char (car jg-tag-unify-layer/jg-tag-unify-layer-region))
       (setq prior-point (- (point) 1))
-      (while (and (/= prior-point (point)) (< (line-number-at-pos (point)) end-line))
+      (while (and (/= prior-point (point)) (< (point) end-pos))
         (progn (setq current-tags (split-string (bibtex-autokey-get-field "tags") "," t " +")
                      prior-point (point))
                (mapc add-func actual-candidates)
@@ -36,12 +35,11 @@
 (defun jg-tag-unify-layer/bibtex-set-new-tag (x)
   "A Fallback function to set tags of bibtex entries "
   (save-excursion
-    (goto-char (car jg-tag-unify-layer/jg-tag-unify-layer-region))
     (let ((prior-point (- (point) 1))
-          (end-line (cdr jg-tag-unify-layer/jg-tag-unify-layer-region))
+          (end-pos jg-tag-unify-layer/jg-tag-unify-layer-marker)
           (stripped_tag (jg-tag-unify-layer/strip_spaces x))
           )
-      (while (and (/= prior-point (point)) (< (line-number-at-pos (point)) end-line))
+      (while (and (/= prior-point (point)) (< (point) end-pos))
         (setq prior-point (point))
         (let* ((current-tags (split-string (bibtex-autokey-get-field "tags") "," t " +")))
           (if (not (-contains? current-tags stripped_tag))
@@ -180,11 +178,18 @@ Prefix-arg to move the file otherwise copy it
   (message "Starting Org Clean")
   (message "Hiding Properties")
   ;; indent region
+  ;;wrap lines that are too long
+  (goto-char (point-min))
+  (while (< (point) (point-max))
+    (goto-char (line-end-position))
+    (if (< fill-column (current-column))
+        (fill-region (line-beginning-position) (line-end-position))
+      )
+    (forward-line)
+    )
   (spacemacs/indent-region-or-buffer)
-  ;; (whitespace-cleanup)
-  ;; fill
-  ;; (fill-region (point-min) (point-max))
-
+  (whitespace-cleanup)
+  (org-show-all)
   ;;Find all pic.twitter's and ensure on new line
   (goto-char (point-min))
   (message "Finding pic.twitter's")
@@ -515,7 +520,7 @@ Can operate on regions of headings """
   (let* ((visual-candidates (helm-marked-candidates))
          (actual-candidates (mapcar (lambda (x) (cadr (assoc x jg-tag-unify-layer/jg-tag-unify-layer-candidates-names))) visual-candidates))
          (prior-point 1)
-         (end-line (cdr jg-tag-unify-layer/jg-tag-unify-layer-region))
+         (end-pos jg-tag-unify-layer/jg-tag-unify-layer-marker)
          (current-tags '())
          (add-func (lambda (candidate)
                      (if (not (-contains? current-tags candidate))
@@ -527,9 +532,8 @@ Can operate on regions of headings """
                          (puthash candidate (- (gethash candidate jg-tag-unify-layer/global-tags) 1) jg-tag-unify-layer/global-tags))
                        ))))
     (save-excursion
-      (goto-char (car jg-tag-unify-layer/jg-tag-unify-layer-region))
       (setq prior-point (- (point) 1))
-      (while (and (/= prior-point (point)) (<= (line-number-at-pos (point)) end-line))
+      (while (and (/= prior-point (point)) (< (point) end-pos))
         (progn (setq current-tags (org-get-tags nil t)
                      prior-point (point))
                (mapc add-func actual-candidates)
@@ -697,12 +701,11 @@ Return a hash-table of tags with their instance counts"
 (defun jg-tag-unify-layer/org-set-new-tag (x)
   "Utility to set a new tag for an org heading"
   (save-excursion
-    (goto-char (car jg-tag-unify-layer/jg-tag-unify-layer-region))
     (let ((prior-point (- (point) 1))
-          (end-line (cdr jg-tag-unify-layer/jg-tag-unify-layer-region))
+          (end-pos jg-tag-unify-layer/jg-tag-unify-layer-marker)
           (stripped_tag (jg-tag-unify-layer/strip_spaces x))
           )
-      (while (and (/= prior-point (point)) (< (line-number-at-pos (point)) end-line))
+      (while (and (/= prior-point (point)) (< (point) end-pos))
         (setq prior-point (point))
         (let* ((current-tags (org-get-tags nil t)))
           (if (not (-contains? current-tags stripped_tag))
