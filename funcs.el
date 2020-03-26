@@ -1,9 +1,8 @@
 ;; bibtex
 (defun jg-tag-unify-layer/build-bibtex-list ()
   "Build a list of all bibtex files to use for bibtex-helm "
-  (mapcar (lambda (x) (f-join jg-tag-unify-layer/loc-bibtex x))
-          (-filter (lambda (x) (s-equals? (f-ext x) "bib"))
-                   (directory-files jg-tag-unify-layer/loc-bibtex))))
+  (setq bibtex-completion-bibliography (directory-files jg-tag-unify-layer/loc-bibtex 't "\.bib$")))
+
 (defun jg-tag-unify-layer/bibtex-set-tags (x)
   " Set tags in bibtex entries "
   (let* ((visual-candidates (helm-marked-candidates))
@@ -977,7 +976,7 @@ uses org-babel-edit-distance "
          (curr-sim (+ bound 1))
          (s2 (downcase (string-trim (car (s-split ":" (buffer-substring (line-beginning-position) (line-end-position)))))))
          s1
-        )
+         )
     (while (and (< (point) (point-max))
                 (> curr-sim bound))
       (forward-line)

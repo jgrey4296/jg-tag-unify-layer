@@ -2,7 +2,6 @@
                                         helm
                                         helm-bibtex
                                         dash
-                                        f
                                         org
                                         dired
                                         evil
@@ -11,9 +10,6 @@
                                         )
   )
 
-(defun jg-tag-unify-layer/init-f ()
-  (use-package f :defer t)
-  )
 (defun jg-tag-unify-layer/init-dash ()
   (use-package dash :defer t)
   )
@@ -219,8 +215,6 @@
 
   )
 (defun jg-tag-unify-layer/pre-init-helm-bibtex ()
-  ;; load the bibliography directory on startup
-  (setq bibtex-completion-bibliography (jg-tag-unify-layer/build-bibtex-list))
   ;; Keybind my bib helm
   (spacemacs/set-leader-keys "a h b" 'jg-tag-unify-layer/helm-bibtex)
 
@@ -268,6 +262,11 @@
             )))
 
   )
+(defun jg-tag-unify-layer/post-init-helm-bibtex ()
+  ;; load the bibliography directory on startup
+  (eval-after-load 'f (progn (jg-tag-unify-layer/build-bibtex-list) nil))
+  )
+
 (defun jg-tag-unify-layer/post-init-org ()
   (defun jg-tag-unify-layer/org-mod-map ()
     (spacemacs/set-leader-keys-for-major-mode 'org-mode
