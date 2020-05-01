@@ -285,7 +285,7 @@
   (evil-define-operator jg-tag-unify-layer/jg-tag-unify-layer-helm-start (beg end)
     """ Opens the Tagging Helm """
     (interactive "<R>")
-    (set-marker jg-tag-unify-layer/jg-tag-unify-layer-marker (or evil-visual-end (line-end-position)))
+    (set-marker jg-tag-unify-layer/jg-tag-unify-layer-marker (if (eq evil-state 'visual)  evil-visual-end (line-end-position)))
     (let* ((candidates (jg-tag-unify-layer/jg-tag-unify-layer-candidates))
            (main-source (cons `(candidates . ,(mapcar 'car candidates)) jg-tag-unify-layer/jg-tag-unify-layer-helm))
            )
