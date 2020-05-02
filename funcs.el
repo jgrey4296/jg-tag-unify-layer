@@ -151,6 +151,35 @@ Prefix-arg to move the file otherwise copy it
   )
 
 ;; org cleaning
+(defun jg-tag-unify-layer/fill-paragraph-step-back()
+  (interactive)
+  (goto-char (point-max))
+  (let ((prog (lambda ()
+                (let ((elem (cadr (org-element-at-point))))
+                  (fill-region-as-paragraph
+                   (getf elem :begin) (getf elem :end)))))
+        curr-elem
+        return-to
+        )
+    (while (not (eq (point) (point-min)))
+      (setq curr-elem (org-element-at-point)
+            return-to (getf (cadr curr-elem) :begin))
+      (cond ((eq (car curr-elem) 'property-drawer)
+             (goto-char (- (getf (cadr curr-elem) :begin) 1))
+             )
+            ((eq (car curr-elem) 'headline)
+             (goto-char (- (getf (cadr curr-elem) :begin) 1))
+             )
+            (t
+             (goto-char (getf (cadr curr-elem) :begin))
+             (funcall prog)
+             (insert "\n")
+             )
+            )
+      (goto-char (- return-to 1))
+      )
+    )
+  )
 (defun jg-tag-unify-layer/dired-clean-orgs (name)
   "A Wrapper around clean org to back up the original file "
   (message "----------")
@@ -159,7 +188,7 @@ Prefix-arg to move the file otherwise copy it
     (insert-file-contents name t)
     (write-file (format "%s_orig" name))
     (org-mode)
-    (jg-tag-unify-layer/clean-org)
+    (jg-tag-unify-layer/clean-org t)
     (write-file name)
     )
   (message "Finished Cleaning")
@@ -171,7 +200,7 @@ Prefix-arg to move the file otherwise copy it
     (seq-each 'jg-tag-unify-layer/dired-clean-orgs files)
     )
   )
-(defun jg-tag-unify-layer/clean-org ()
+(defun jg-tag-unify-layer/clean-org (&optional skipfck)
   "The Main Clean-org routine"
   (interactive)
   (message "Starting Org Clean")
@@ -179,14 +208,9 @@ Prefix-arg to move the file otherwise copy it
   ;; indent region
   ;;wrap lines that are too long
   (goto-char (point-min))
-  (while (< (point) (point-max))
-    (goto-char (line-end-position))
-    (if (< fill-column (current-column))
-        (fill-region (line-beginning-position) (line-end-position))
-      )
-    (forward-line)
-    )
+  (jg-tag-unify-layer/wrap-non-link-urls)
   (spacemacs/indent-region-or-buffer)
+  (jg-tag-unify-layer/fill-paragraph-step-back)
   (whitespace-cleanup)
   (org-show-all)
   ;;Find all pic.twitter's and ensure on new line
@@ -254,8 +278,28 @@ Prefix-arg to move the file otherwise copy it
     (replace-match "][")
     )
 
+  (if (not skipfck)
+      (progn
+        (goto-char (point-min))
+        (while (re-search-forward  "file:.+?%.+$" nil t)
+          (if (jg-spacemacs-org/link-not-exists-p)
+              (progn
+                (goto-char (line-beginning-position))
+                (insert "--->")
+                (if (s-equals? (read-string "Delete line? ") "y")
+                    (delete-region (line-beginning-position) (line-end-position))
+                  (progn
+                    (delete-region (line-beginning-position)
+                                   (+ (line-beginning-position) (length "--->")))
+                    (forward-line))
+                  ))
+            )
+          )
+        )
+    )
+
   (org-cycle-hide-drawers 'all)
-  (goto-char (point-min ))
+  (goto-char (point-min))
   (message "Org Clean Finished")
   )
 (defun jg-tag-unify-layer/map-entries-clean-whitespace ()
