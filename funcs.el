@@ -250,6 +250,8 @@ Prefix-arg to move the file otherwise copy it
               (join-line))
              ((eq 0 (string-match "^[[:space:]]+:PROPERTIES:" prev-line))
               nil)
+             ((eq 0 (string-match "^[[:space:]]+:URL: " (buffer-substring (line-beginning-position) (point))))
+              nil)
              ((not (eq 0 (string-match "^[[:space:]]*$" (buffer-substring
                                                          (line-beginning-position)
                                                          (point)))))
@@ -336,7 +338,7 @@ to point to a single new line"
   (let ((start (if (eq evil-state 'visual) evil-visual-beginning (point-min)))
         (last (if (eq evil-state 'visual) evil-visual-end  nil)))
     (goto-char start)
-    (while (re-search-forward "[^[[]\\(http[^ …]+\\)" last t)
+    (while (re-search-forward "[^[[]\\(http[^ …\n]+\\)" last t)
       (replace-match "[[\\1][ᵢ]]")
       )
     )
