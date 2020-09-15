@@ -25,13 +25,24 @@
               ;; Start Position -> End Line number because of changes in positions from tag add/retract
               jg-tag-unify-layer/jg-tag-unify-layer-marker (make-marker)
               jg-tag-unify-layer/last-similarity-arg 1
+
+              ;; Bibtex optional fields
+              bibtex-user-optional-fields '(("annotation" "Personal Annotation")
+                                            ("tags" "Set of tags")
+                                            ("isbn" "ISBN of file")
+                                            ("doi" "DOI of file")
+                                            ("url" "Url of file")
+                                            ("file" "The path of the file")
+                                            ("translator" "The Translators of the work")
+                                            )
+
               )
 
 (add-hook 'bibtex-mode-hook
           (lambda ()
             (let ((misc (assoc "Misc" bibtex-BibTeX-entry-alist))
                   (copied (assoc-delete-all "Misc" (copy-alist bibtex-BibTeX-entry-alist)))
-                  (custom '("Misc" "Miscellaneous" nil nil (("author") ("title" "Title of the work (BibTeX converts it to lowercase)") ("howpublished" "The way in which the work was published") ("month") ("year") ("note") ("file") ("keywords")))))
+                  (custom '("Misc" "Miscellaneous" nil nil (("author") ("title" "Title of the work (BibTeX converts it to lowercase)") ("howpublished" "The way in which the work was published") ("month") ("year") ("file")))))
               (setq bibtex-BibTeX-entry-alist (cons custom copied))
               )
             ))
