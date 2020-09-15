@@ -7,8 +7,14 @@
                                         evil
                                         (tag-clean-minor-mode :location local)
                                         (tag-mode :location local)
+                                        (jg-tag-unify-utils :location local :step bootstrap)
                                         )
   )
+
+(defun jg-tag-unify-layer/init-jg-tag-unify-utils ()
+    (use-package jg-tag-unify-utils)
+)
+
 
 (defun jg-tag-unify-layer/init-dash ()
   (use-package dash :defer t)
@@ -26,8 +32,8 @@
                                        "Tweet Link"  'jg-tag-unify-layer/tweet-link-action
                                        )
             :filter-one-by-one 'jg-tag-unify-layer/grep-filter-one-by-one
-            :nomark nil
-            :backend helm-grep-default-command
+		    :nomark nil
+		    :backend helm-grep-default-command
             :pcre nil
             )
           jg-tag-unify-layer/twitter-helm-source
@@ -274,7 +280,6 @@
       ". w" 'jg-tag-unify-layer/wrap-numbers
       ". L" 'jg-tag-unify-layer/wrap-non-link-urls
       ". D" 'jg-tag-unify-layer/remove-duplicates
-      ". s" 'jg-tag-unify-layer/split-on-char-n
       "x s" 'jg-tag-unify-layer/next-similar-string
       )
     )
